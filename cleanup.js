@@ -18,7 +18,7 @@ import xpath from "xpath";
 const steps = {
   resequence: resequenceFootnotes,
   flatten: flattenPoems,
-  arabic: fixArabicMarkers,
+  //arabic: fixArabicMarkers,
   english:    fixEnglishAnchors // retag existing <a> in en text
 };
 
@@ -189,19 +189,39 @@ function fixEnglishAnchors(doc) {
       .filter(p => p.getAttribute("lang") === "en");
     if (enNodes.length === 0) return;
 
+    console.log(`Processing <para> id='${para.getAttribute("id") || "unknown"}'`);
+
     enNodes.forEach(p => {
-      // collect existing anchors inside this p
-      const anchors = Array.from(p.getElementsByTagName("a")).filter(a => a.getAttribute("class") === "footnote-ref");
+      // collect existing anchors inside this p i.e. <a tags />
+      const linkRegExp = /<a[^>]*>(.*?)<\/a>/g;
+      const anchors = p.textContent.match(linkRegExp) || [];
+
       if (!anchors.length) return;
 
+      console.log(`   Found ${anchors.length} existing anchors`);
+
       anchors.forEach((a, idx) => {
-        const foot = foots[idx];
-        if (!foot) return; // safeguard
-        const id = foot.getAttribute("id");
-        const num = /f(\d+)/.exec(id)?.[1] || String(counter + idx);
-        a.setAttribute("href", `#${id}`);
-        a.setAttribute("id", `ref${num}`);
-        a.textContent = `(${num})`;
+
+        console.log(`    Processing anchor ${idx + 1}`);
+        console.log(`    Original anchor: ${a}`);
+        console.log(`    Counter: ${counter}`);
+
+        const footnoteId = foots[idx].getAttribute("id") || "unknown";
+        console.log(`    Footnote ID: '${footnoteId}'`);
+        const footnoteRef = `(${counter})`;
+        console.log(`    Footnote reference: '${footnoteRef}'`);
+        console.log(`    Replacing '${a}' with '${footnoteRef}'`);
+
+        const footnoteLink = `<a href="#${footnoteId}" id="ref${counter}" class="footnote-ref">${footnoteRef}</a>`;
+
+        const newText = a.replace(linkRegExp, footnoteLink);
+        p.textContent = newText;
+
+        console.log(`    Updated anchor: ${newText}`);
+        console.log(`    Updated text: ${p.textContent}`);
+
+        counter++;
+
       });
     });
   });
