@@ -29,7 +29,8 @@ if (!inFile) {
   process.exit(1);
 }
 
-const raw = fs.readFileSync(inFile, "utf8");
+const raw = fs.readFileSync(inFile, "utf8").replace(/^\uFEFF/, ''); // Remove BOM if present
+
 validateWellFormed(raw);
 
 const doc = new DOMParser().parseFromString(raw, "text/xml");
