@@ -212,9 +212,9 @@ function fixEnglishAnchors(doc) {
         console.log(`    Footnote reference: '${footnoteRef}'`);
         console.log(`    Replacing '${a}' with '${footnoteRef}'`);
 
-        const footnoteLink = `<a href="#${footnoteId}" id="ref${counter}" class="footnote-ref">${footnoteRef}</a>`;
+        const footnoteLink = `<a href="#${counter}" id="ref${counter}" class="footnote-ref">${footnoteRef}</a>`;
 
-        const newText = a.replace(linkRegExp, footnoteLink);
+        const newText = p.textContent.replace(linkRegExp, footnoteLink);
         p.textContent = newText;
 
         console.log(`    Updated anchor: ${newText}`);
