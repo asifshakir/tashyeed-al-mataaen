@@ -19,6 +19,7 @@ const steps = {
   resequence: resequenceFootnotes,
   flatten: flattenPoems,
   arabic: fixArabicMarkers,
+  english:    fixEnglishAnchors // retag existing <a> in en text
 };
 
 // ───────── ENTRY ─────────
@@ -150,55 +151,58 @@ function fixArabicMarkers(doc) {
       const matches = paraText.match(re);
       if (!matches) return; // no matches found
       console.log(`    Found matches: ${matches.join(", ")}`);
-
       console.log(`    Total matches: ${matches.length}, Footnotes: ${foots.length}`);
-
       matches.forEach((match, matchIdx) => {
-
         console.log(`    Match index: ${matchIdx}`);
         console.log(`    Counter: '${counter}'`);
-
         if(counter === 79) {
           counter++;
           matchIdx++;
         }
-
         const matchingFooter = foots[matchIdx];
-
         console.log(`    Match index: ${matchIdx}`);
         console.log(`    Found match: '${match}'`);
         console.log(`    Replacing '${match}' with '${counter}'`);
-        
         const footnoteId = matchingFooter.getAttribute("id") || "unknown";
-
         console.log(`    Footnote ID: '${footnoteId}'`);
-
+        const footnoteRef = `(${counter})`;
+        const footnoteLink = `<a href="#${footnoteId}" id="ref${counter}" class="footnote-ref">${footnoteRef}</a>`;
+        const newText = paraText.replace(match, footnoteLink);
+        p.textContent = newText;
+        console.log(`    Updated text: ${newText}`);
         counter++;
       });
+    });
+  });
+}
 
+function fixEnglishAnchors(doc) {
+  const select = xpath.useNamespaces({});
+  let counter = 1;
+  const paras = select("//para[footnotes]", doc);
+  paras.forEach(para => {
+    const foots = Array.from(select("footnotes/footnote", para));
+    if (!foots.length) return;
 
-      // p.childNodes.forEach(node => {
-      //   if (node.nodeType !== 3) return; // text only
-      //   const parts = node.nodeValue.split(re);
-      //   if (parts.length === 1) return;
-      //   const frag = doc.createDocumentFragment();
-      //   let idx = 0;
-      //   for (let i = 0; i < parts.length; i++) {
-      //     if (i % 3 === 0) { // plain segment
-      //       if (parts[i]) frag.appendChild(doc.createTextNode(parts[i]));
-      //     } else if (parts[i]) {
-      //       const a = doc.createElement("a");
-      //       a.setAttribute("href", `#f${counter}`);
-      //       a.setAttribute("id", `ref${counter}`);
-      //       a.setAttribute("class", "footnote-ref");
-      //       a.appendChild(doc.createTextNode(`(${counter})`));
-      //       frag.appendChild(a);
-      //       counter++;
-      //       idx++;
-      //     }
-      //   }
-      //   para.replaceChild(frag, node);
-      // });
+    const enNodes = Array.from(para.childNodes)
+      .filter(n => n.nodeType === 1 && n.nodeName === "p")
+      .filter(p => p.getAttribute("lang") === "en");
+    if (enNodes.length === 0) return;
+
+    enNodes.forEach(p => {
+      // collect existing anchors inside this p
+      const anchors = Array.from(p.getElementsByTagName("a")).filter(a => a.getAttribute("class") === "footnote-ref");
+      if (!anchors.length) return;
+
+      anchors.forEach((a, idx) => {
+        const foot = foots[idx];
+        if (!foot) return; // safeguard
+        const id = foot.getAttribute("id");
+        const num = /f(\d+)/.exec(id)?.[1] || String(counter + idx);
+        a.setAttribute("href", `#${id}`);
+        a.setAttribute("id", `ref${num}`);
+        a.textContent = `(${num})`;
+      });
     });
   });
 }
