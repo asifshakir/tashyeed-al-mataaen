@@ -150,7 +150,7 @@ function fixArabicMarkers(doc) {
         console.log(`    Match index: ${matchIdx}`);
         console.log(`    Counter: '${counter}'`);
 
-        if(counter === 78) {
+        if(counter === 79) {
           counter++;
           matchIdx++;
         }
