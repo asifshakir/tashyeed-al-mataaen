@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tashyeed Viewer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <div id="app" class="max-w-7xl mx-auto pb-16">
+    <!-- Sticky Header -->
+    <header class="sticky top-0 z-50 bg-white/90 backdrop-blur flex flex-wrap items-center justify-between gap-4 px-4 py-2 shadow">
+      <h1 class="text-xl font-semibold">Tashyeed Viewer</h1>
+
+      <!-- language toggles -->
+      <div class="flex items-center gap-2">
+        <button @click="showEn = !showEn" :class="toggleClass(showEn)" class="px-2 py-1 rounded">🇬🇧 EN</button>
+        <button @click="showFa = !showFa" :class="toggleClass(showFa)" class="px-2 py-1 rounded">🇮🇷 FA</button>
+      </div>
+
+      <!-- Page dropdown -->
+      <div class="flex items-center gap-2">
+        <label class="text-sm">Jump&nbsp;to&nbsp;page:</label>
+        <select v-model="gotoPage" @change="scrollToPage(gotoPage)" class="border rounded px-2 py-1 text-sm bg-white">
+          <option v-for="p in pages" :key="p" :value="p">{{ p }}</option>
+        </select>
+      </div>
+    </header>
+
+    <!-- Layout -->
+    <div class="flex flex-col md:flex-row gap-6 mt-4 px-4">
+      <!-- TOC -->
+      <aside class="md:w-60 space-y-2">
+        <h2 class="font-medium mb-2">Chapters</h2>
+        <nav class="space-y-1">
+          <a v-for="ch in chapters" :key="ch.id" :href="'#chap-' + ch.id" class="block rounded px-2 py-1 text-sm hover:bg-gray-200" :class="{'bg-gray-200 font-semibold': activeChapter === ch.id}" @click="activeChapter = ch.id">{{ ch.title.en || ch.title.fa || 'Untitled' }}</a>
+        </nav>
+      </aside>
+
+      <!-- Content -->
+      <main class="flex-1 space-y-8">
+        <div v-for="ch in chapters" :key="ch.id" :id="'chap-' + ch.id" class="bg-white shadow rounded overflow-hidden">
+          <header class="bg-gray-200 px-4 py-2 text-lg font-semibold flex justify-between items-center">
+            <span>{{ ch.title.en || ch.title.fa || 'Untitled' }}</span>
+            <span class="text-xs text-gray-600">Chapter id: {{ ch.id }}</span>
+          </header>
+
+          <!-- pages within chapter -->
+          <div v-for="page in ch.pages" :key="page.num" :id="'page-' + page.num" class="border-t px-4 py-4 space-y-4">
+            <div class="flex justify-between items-center">
+              <h3 class="font-medium">Page {{ page.num }}</h3>
+              <a :href="'images/p-' + page.num.toString().padStart(3,'0') + '.jpg'" target="_blank" class="text-sm text-blue-600 hover:underline">📖 scan</a>
+            </div>
+
+            <template v-for="blk in page.blocks">
+              <!-- Arabic always -->
+              <p class="text-right leading-relaxed" dir="rtl" v-html="blk.ar"></p>
+              <!-- Persian -->
+              <p v-if="showFa && blk.fa" class="leading-relaxed" dir="rtl" v-html="blk.fa"></p>
+              <!-- English -->
+              <p v-if="showEn && blk.en" class="leading-relaxed" v-html="blk.en"></p>
+              <!-- footnotes list -->
+              <ol v-if="blk.fns.length" class="list-decimal ms-6 text-sm space-y-1">
+                <li v-for="fn in blk.fns" :key="fn.n">
+                  <span v-if="showFa && fn.fa" v-html="fn.fa"></span>
+                  <span v-if="showEn && fn.en" v-html="fn.en"></span>
+                </li>
+              </ol>
+            </template>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+  const { createApp, ref, computed, onMounted } = Vue;
+  createApp({
+    setup() {
+      const showEn = ref(false);
+      const showFa = ref(false);
+      const chapters = ref([]);
+      const activeChapter = ref(null);
+      const pages = ref([]);
+      const gotoPage = ref('');
+
+      // button style helper
+      const toggleClass = (on) => on ? 'bg-blue-600 text-white' : 'bg-gray-200';
+
+      const scrollToPage = (n) => {
+        const el = document.getElementById('page-' + n);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+
+      const parseXml = async () => {
+        const res = await fetch('tashyeed-vol01.xml');
+        const txt = await res.text();
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(txt, 'application/xml');
+
+        // collect chapters
+        const chEls = Array.from(xml.getElementsByTagName('chapter'));
+        chapters.value = chEls.map((ch) => {
+          const id = ch.getAttribute('id');
+
+          // title
+          const titleEl = ch.querySelector('title');
+          const title = {
+            fa: titleEl?.querySelector('p[lang="fa"]')?.textContent ?? '',
+            en: titleEl?.querySelector('p[lang="en"]')?.textContent ?? ''
+          };
+
+          // paras directly under this chapter
+          const paras = Array.from(ch.children).filter(n => n.tagName === 'para');
+
+          // group paras by data-source-page
+          const pageMap = {};
+          paras.forEach(p => {
+            const pageNum = p.getAttribute('data-source-page') || '0';
+            if (!pageMap[pageNum]) pageMap[pageNum] = [];
+
+            // texts
+            const ar = (p.querySelector('p[lang="ar"]')?.innerHTML || '').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+            const fa = (p.querySelector('p[lang="fa"]')?.innerHTML || '').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+            const en = (p.querySelector('p[lang="en"]')?.innerHTML || '').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+
+            // footnotes
+            const fns = [];
+            const fnEls = p.querySelectorAll('footnotes footnote');
+            fnEls.forEach((fnEl, i) => {
+              fns.push({
+                n: i + 1,
+                fa: (fnEl.querySelector('p[lang="fa"]')?.innerHTML || '').replace(/&lt;/g,'<').replace(/&gt;/g,'>'),
+                en: (fnEl.querySelector('p[lang="en"]')?.innerHTML || '').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+              });
+            });
+
+            pageMap[pageNum].push({ ar, fa, en, fns });
+          });
+
+          const pageObjs = Object.entries(pageMap).map(([num, blocks]) => ({ num, blocks }));
+          pageObjs.sort((a,b) => +a.num - +b.num);
+          return { id, title, pages: pageObjs };
+        });
+
+        // pages list for dropdown
+        const allPages = new Set();
+        chapters.value.forEach(ch => ch.pages.forEach(pg => allPages.add(pg.num)));
+        pages.value = Array.from(allPages).sort((a,b) => +a - +b);
+        gotoPage.value = pages.value[0] || '';
+        activeChapter.value = chapters.value[0]?.id || null;
+      };
+
+      onMounted(parseXml);
+
+      return { showEn, showFa, chapters, activeChapter, toggleClass, scrollToPage, pages, gotoPage };
+    }
+  }).mount('#app');
+  </script>
+</body>
+</html>
