@@ -2,6 +2,7 @@
   "name": "tashyee",
   "version": "1.0.0",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -10,7 +11,9 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "dotenv": "^16.5.0",
     "fast-xml-parser": "^5.2.0",
+    "groq-sdk": "^0.19.0",
     "xmldom": "^0.6.0",
     "xpath": "^0.0.34"
   }
