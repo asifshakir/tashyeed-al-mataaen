@@ -82,13 +82,21 @@ function validateNoNestedChapter(doc) {
 // ───────── STEP IMPLEMENTATIONS ───────── (unchanged logic, abbreviated)
 function resequenceFootnotes(doc) {
   const select = xpath.useNamespaces({});
+
+  // 1) Resequence <para> ids in document order (depth‑first)
+  const paras = select("//para", doc);
+  paras.forEach((p, idx) => {
+    p.setAttribute("id", String(idx + 1));
+  });
+
+  // 2) Resequence <footnote> ids and visible labels
   const footnotes = select("//footnote", doc);
   footnotes.forEach((fn, i) => {
     const n = i + 1;
     fn.setAttribute("id", `f${n}`);
     Array.from(fn.getElementsByTagName("p")).forEach(p => {
       const txt = p.textContent.replace(/^\s*[\[(]?\d+(?:\.\d+)?[\]:)\]]?[-.]*\s*/, "").trim();
-      p.textContent = `( ${n} ) ${txt}`;
+      p.textContent = `(${n}) ${txt}`;
     });
   });
 }
